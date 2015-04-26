@@ -55,13 +55,11 @@ task setupSpark(type: Copy) {
 }
 
 task bootstrapPython(type: Exec) {
-    doFirst { bootstrapPythonDir.deleteDir() }
     commandLine "bash", configurations.minicondaInstaller.singleFile, "-b", "-p", bootstrapPythonDir
     outputs.dir bootstrapPythonDir
 }
 
 task setupPython(type: Exec, dependsOn: bootstrapPython) {
-    doFirst { pythonDir.deleteDir() }
     commandLine "$bootstrapPythonDir/bin/conda", "create", "-p", pythonDir, "--yes", "--quiet",
         "ipython-notebook",
         "matplotlib",
