@@ -1,2 +1,1 @@
-language: python
-script: ./gradlew test
+language: java

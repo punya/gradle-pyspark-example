@@ -1,4 +1,4 @@
 """
 >>> print 'hi'
-hello
+hi
 """

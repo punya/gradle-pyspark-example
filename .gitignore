@@ -1,4 +1,6 @@
 .gradle/
 build/
+metastore_db/
 *.pyc
 *.swp
+derby.log
