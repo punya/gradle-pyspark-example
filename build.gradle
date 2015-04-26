@@ -1,4 +1,4 @@
-task setupPython(type: Exec, dependsOn: downloadMinicondaInstaller) {
+task setupPython(type: Exec) {
     doFirst {
         def os = System.getProperty('os.name').replaceAll(' ', '')
         file(buildDir).mkdirs()
