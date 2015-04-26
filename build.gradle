@@ -1,86 +1,29 @@
-plugins {
-    id "java"
-}
+apply plugin: 'io.github.punya.miniconda'
+apply plugin: 'io.github.punya.spark'
+apply plugin: 'java'
 
-repositories {
-    ivy {
-        url "http://repo.continuum.io"
-        layout "pattern", {
-            artifact "[organisation]/[module]-[revision]-[classifier].[ext]"
-        }
-    }
-    ivy {
-        url "http://mirrors.ibiblio.org"
-        layout "pattern", {
-            artifact "[organisation]/[module]-[revision]/[module]-[revision]-[classifier].[ext]"
-            m2compatible = true
-        }
-    }
-}
-
-configurations {
-    minicondaInstaller
-    sparkDistribution
-}
-
-dependencies {
-    def os = System.getProperty('os.name').replaceAll(' ', '')
-    def arch = "x86_64"
-    minicondaInstaller(group: "miniconda", name: "Miniconda", version: "3.10.1") {
-        artifact {
-            name = "Miniconda"
-            type = "sh"
-            classifier = "$os-$arch"
-            extension = "sh"
-        }
-    }
-    sparkDistribution(group: "apache.spark", name: "spark", version: "1.3.1") {
-        artifact {
-            name = "spark"
-            type = "tgz"
-            classifier = "bin-hadoop2.4"
-            extension = "tgz"
-        }
-    }
-}
-
-def bootstrapPythonDir = file("$buildDir/bootstrap-python")
-def pythonDir = file("$buildDir/python")
-def sparkDir = file("$buildDir/spark")
-
-RelativePath stripParent(RelativePath p) {
-    return new RelativePath(p.endsWithFile, p.segments[1..-1] as String[])
-}
-
-task setupSpark(type: Copy) {
-    from tarTree(configurations.sparkDistribution.singleFile)
-    into sparkDir
-    eachFile { it.relativePath = stripParent(it.relativePath) }
-}
-
-task bootstrapPython(type: Exec) {
-    commandLine "bash", configurations.minicondaInstaller.singleFile, "-b", "-p", bootstrapPythonDir
-    outputs.dir bootstrapPythonDir
-}
-
-task setupPython(type: Exec, dependsOn: bootstrapPython) {
-    commandLine "$bootstrapPythonDir/bin/conda", "create", "-p", pythonDir, "--yes", "--quiet",
+miniconda {
+    packages = [
         "ipython-notebook",
         "matplotlib",
         "pandas",
         "pylint",
         "pytest",
-        "seaborn"
+        "seaborn",
         "scikit-learn"
-    outputs.dir pythonDir
+    ]
 }
 
-task testPythonWithSpark(type: Exec, dependsOn: [setupPython, setupSpark]) {
-    environment "PYSPARK_DRIVER_PYTHON", "$pythonDir/bin/py.test"
-    environment "PYSPARK_DRIVER_PYTHON_OPTS", "artichoke tests --doctest-modules --verbose --color=yes"
-    environment "PYSPARK_PYTHON", "$pythonDir/bin/python"
-    environment "SPARK_CONF_DIR", "$projectDir/conf"
-    commandLine "$sparkDir/bin/pyspark"
+spark {
+    version = "1.3.1"
 }
 
-test.dependsOn testPythonWithSpark
+test << {
+    exec {
+        environment "PYSPARK_DRIVER_PYTHON", "${miniconda.dir}/bin/py.test"
+        environment "PYSPARK_DRIVER_PYTHON_OPTS", "artichoke tests --doctest-modules --verbose --color=yes"
+        environment "PYSPARK_PYTHON", "${miniconda.dir}/bin/python"
+        environment "SPARK_CONF_DIR", "$projectDir/conf"
+        commandLine "${spark.dir}/bin/pyspark"
+    }
+}
