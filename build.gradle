@@ -1,51 +1,82 @@
-task setupPython(type: Exec) {
-    doFirst {
-        def os = System.getProperty('os.name').replaceAll(' ', '')
-        file(buildDir).mkdirs()
-        ant.get(
-            src: "http://repo.continuum.io/miniconda/Miniconda-3.10.1-$os-x86_64.sh",
-            dest: "$buildDir/installer.sh",
-            usetimestamp: true
-        )
+repositories {
+    ivy {
+        url "http://repo.continuum.io"
+        layout "pattern", {
+            artifact "[organisation]/[module]-[revision]-[classifier].[ext]"
+        }
     }
-    onlyIf { !file("$buildDir/python").exists() }
-    commandLine "bash", "$buildDir/installer.sh", "-b", "-p", "$buildDir/python"
+    ivy {
+        url "http://mirrors.ibiblio.org"
+        layout "pattern", {
+            artifact "[organisation]/[module]-[revision]/[module]-[revision]-[classifier].[ext]"
+            m2compatible = true
+        }
+    }
 }
 
-task setupEnvironment(type: Exec, dependsOn: setupPython) {
-    commandLine "$buildDir/python/bin/conda", "install", "--yes", "--quiet",
-    	"ipython-notebook",
-	"matplotlib",
-	"pandas",
-	"pylint",
-	"pytest",
-	"seaborn"
-	"scikit-learn"
+configurations {
+    minicondaInstaller
+    sparkDistribution
 }
 
-task setupSpark {
-    onlyIf { !file("$buildDir/spark").exists() }
-    file(buildDir).mkdirs()
-    ant.get(
-        src: "http://mirrors.ibiblio.org/apache/spark/spark-1.3.1/spark-1.3.1-bin-hadoop2.4.tgz",
-        dest: "$buildDir/spark.tgz",
-        usetimestamp: true
-    )
-    copy {
-        from tarTree("$buildDir/spark.tgz")
-        into "$buildDir/temp"
+dependencies {
+    def os = System.getProperty('os.name').replaceAll(' ', '')
+    def arch = "x86_64"
+    minicondaInstaller(group: "miniconda", name: "Miniconda", version: "3.10.1") {
+        artifact {
+            name = "Miniconda"
+            type = "sh"
+            classifier = "$os-$arch"
+            extension = "sh"
+        }
     }
-    file("$buildDir/temp").listFiles().each { it.renameTo("$buildDir/spark") }
-    file("$buildDir/temp").delete()
+    sparkDistribution(group: "apache.spark", name: "spark", version: "1.3.1") {
+        artifact {
+            name = "spark"
+            type = "tgz"
+            classifier = "bin-hadoop2.4"
+            extension = "tgz"
+        }
+    }
 }
 
-task test(type: Exec, dependsOn: [setupEnvironment, setupSpark]) {
-    doFirst {
-        file("$buildDir/reports/junit").mkdirs()
-    }
-    environment "PYSPARK_DRIVER_PYTHON", "$buildDir/python/bin/py.test"
+def bootstrapPythonDir = file("$buildDir/bootstrap-python")
+def pythonDir = file("$buildDir/python")
+def sparkDir = file("$buildDir/spark")
+
+RelativePath stripParent(RelativePath p) {
+    return new RelativePath(p.endsWithFile, p.segments[1..-1] as String[])
+}
+
+task setupSpark(type: Copy) {
+    from tarTree(configurations.sparkDistribution.singleFile)
+    into sparkDir
+    eachFile { it.relativePath = stripParent(it.relativePath) }
+}
+
+task bootstrapPython(type: Exec) {
+    doFirst { bootstrapPythonDir.deleteDir() }
+    commandLine "bash", configurations.minicondaInstaller.singleFile, "-b", "-p", bootstrapPythonDir
+    outputs.dir bootstrapPythonDir
+}
+
+task setupPython(type: Exec, dependsOn: bootstrapPython) {
+    doFirst { pythonDir.deleteDir() }
+    commandLine "$bootstrapPythonDir/bin/conda", "create", "-p", pythonDir, "--yes", "--quiet",
+        "ipython-notebook",
+        "matplotlib",
+        "pandas",
+        "pylint",
+        "pytest",
+        "seaborn"
+        "scikit-learn"
+    outputs.dir pythonDir
+}
+
+task test(type: Exec, dependsOn: [setupPython, setupSpark]) {
+    environment "PYSPARK_DRIVER_PYTHON", "$pythonDir/bin/py.test"
     environment "PYSPARK_DRIVER_PYTHON_OPTS", "artichoke tests --doctest-modules --verbose --color=yes"
-    environment "PYSPARK_PYTHON", "$buildDir/python/bin/python"
+    environment "PYSPARK_PYTHON", "$pythonDir/bin/python"
     environment "SPARK_CONF_DIR", "$projectDir/conf"
-    commandLine "$buildDir/spark/bin/pyspark"
+    commandLine "$sparkDir/bin/pyspark"
 }
