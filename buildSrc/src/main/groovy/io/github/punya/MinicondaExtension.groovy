@@ -49,6 +49,7 @@ class MinicondaExtension {
                     }
                 }
             }
+            p.tasks.getByName("assemble").dependsOn "setupPython"
         }
     }
 }

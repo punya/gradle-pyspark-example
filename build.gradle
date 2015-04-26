@@ -1,6 +1,4 @@
-apply plugin: 'io.github.punya.miniconda'
-apply plugin: 'io.github.punya.spark'
-apply plugin: 'java'
+apply plugin: 'io.github.punya.pyspark'
 
 miniconda {
     packages = [
@@ -18,20 +16,22 @@ spark {
     version = "1.3.1"
 }
 
-assemble.dependsOn "setupPython", "setupSpark"
-
-test << {
-    exec {
-        environment "PYSPARK_DRIVER_PYTHON", "${miniconda.dir}/bin/py.test"
-        environment "PYSPARK_DRIVER_PYTHON_OPTS", "artichoke tests --doctest-modules --verbose --color=yes"
-        environment "PYSPARK_PYTHON", "${miniconda.dir}/bin/python"
-        environment "SPARK_CONF_DIR", "$projectDir/conf"
-        commandLine "${spark.dir}/bin/pyspark"
-    }
+repositories {
+    mavenCentral()
 }
 
-check << {
-    exec {
-        commandLine "${miniconda.dir}/bin/pylint", "artichoke", "--output-format=colorized", "--reports=n"
-    }
+configurations {
+    provided
 }
+
+sourceSets {
+    main.compileClasspath += configurations.provided
+    test.compileClasspath += configurations.provided
+    test.runtimeClasspath += configurations.provided
+}
+
+dependencies {
+    provided "org.apache.spark:spark-sql_2.10:1.3.1"
+    compile "com.google.guava:guava:18.0"
+}
+

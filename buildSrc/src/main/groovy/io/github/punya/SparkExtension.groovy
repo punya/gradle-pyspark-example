@@ -38,7 +38,9 @@ class SparkExtension {
                 from p.tarTree(p.configurations.sparkDistribution.singleFile)
                 into dir
                 eachFile { it.relativePath = stripParent(it.relativePath) }
+                includeEmptyDirs false
             }
+            p.tasks.getByName("assemble").dependsOn "setupSpark"
         }
     }
 
