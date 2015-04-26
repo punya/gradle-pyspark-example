@@ -1,0 +1,2 @@
+include versioneer.py
+include artichoke/_version.py
