@@ -1,3 +1,7 @@
+plugins {
+    id "java"
+}
+
 repositories {
     ivy {
         url "http://repo.continuum.io"
@@ -71,10 +75,12 @@ task setupPython(type: Exec, dependsOn: bootstrapPython) {
     outputs.dir pythonDir
 }
 
-task test(type: Exec, dependsOn: [setupPython, setupSpark]) {
+task testPythonWithSpark(type: Exec, dependsOn: [setupPython, setupSpark]) {
     environment "PYSPARK_DRIVER_PYTHON", "$pythonDir/bin/py.test"
     environment "PYSPARK_DRIVER_PYTHON_OPTS", "artichoke tests --doctest-modules --verbose --color=yes"
     environment "PYSPARK_PYTHON", "$pythonDir/bin/python"
     environment "SPARK_CONF_DIR", "$projectDir/conf"
     commandLine "$sparkDir/bin/pyspark"
 }
+
+test.dependsOn testPythonWithSpark
