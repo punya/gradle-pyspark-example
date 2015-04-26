@@ -1,5 +1,6 @@
 .gradle/
 build/
+dist/
 metastore_db/
 *.pyc
 *.swp

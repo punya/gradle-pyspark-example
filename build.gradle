@@ -39,7 +39,7 @@ task setupSpark {
     file("$buildDir/temp").delete()
 }
 
-task test(type: Exec, dependsOn: setupEnvironment) {
+task test(type: Exec, dependsOn: [setupEnvironment, setupSpark]) {
     doFirst {
         file("$buildDir/reports/junit").mkdirs()
     }
